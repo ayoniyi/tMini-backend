@@ -1,13 +1,16 @@
 const express = require('express')
 const app = express()
 const mongoose = require('mongoose')
-//const dotenv = require("dotenv");
 const helmet = require('helmet')
 const morgan = require('morgan')
-//const jwt = require('jsonwebtoken');
 const cors = require('cors')
-const multer = require('multer')
-const path = require('path')
+// const multer = require('multer')
+// const path = require('path')
+// **
+const aws = require('aws-sdk')
+const crypto = require('crypto')
+const util = require('util')
+// **
 
 //dotenv.config(); // deprecated ?
 require('dotenv/config')
@@ -38,35 +41,47 @@ app.get('/check', (req, res) => {
   res.send('The API IS UP AND RUNNING ')
 })
 
-// **** multer upload block ****
-//
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')))
+// Generate randombytes
+const randomBytes = util.promisify(crypto.randomBytes)
 
-// storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'public/uploads')
-  },
-  filename: (req, file, cb) => {
-    console.log('req body', req.body)
-    cb(null, file.originalname)
-  },
+// AWS S3 Code
+const region = process.env.AWS_BUCKET_REGION
+const bucketName = process.env.AWS_BUCKET
+const accessKeyId = process.env.AWS_ACCESS_KEY
+const secretAccessKey = process.env.AWS_SECRET_KEY
+
+const s3 = new aws.S3({
+  region,
+  accessKeyId,
+  secretAccessKey,
+  signatureVersion: 'v4',
 })
 
-// upload
-const upload = multer({ storage })
-app.post('/api/upload', upload.single('file'), (req, res) => {
-  try {
-    return res.status(200).json('File uploaded')
-  } catch (err) {
-    console.log(err)
+//***** */ S3 UPLOAD BLOCK /*******/
+async function generateUploadURL() {
+  const rawBytes = await randomBytes(16)
+  const imageName = rawBytes.toString('hex')
+  const params = {
+    Bucket: bucketName,
+    Key: imageName,
+    Expires: 60,
   }
-})
+  const uploadURL = await s3.getSignedUrlPromise('putObject', params)
+  //console.log(uploadURL)
+  return uploadURL
+}
+//***** */ S3 UPLOAD BLOCK /*******/
 
 // Use Routes
 app.use('/api/user', usersRoute)
 app.use('/api/auth', authRoute)
 app.use('/api/post', postRoute)
+
+// Generate s3 URL
+app.get('/api/s3url', async (req, res) => {
+  const gurl = await generateUploadURL()
+  res.send({ gurl })
+})
 
 // Listen
 app.listen(8800, () => {

@@ -3,6 +3,12 @@ const mongoose = require('mongoose')
 //const PatientSchema = mongoose.Schema({ // regular method
 const UserSchema = new mongoose.Schema(
   {
+    name: {
+      type: String,
+      required: true,
+      min: 3,
+      max: 200,
+    },
     username: {
       type: String,
       required: true,
