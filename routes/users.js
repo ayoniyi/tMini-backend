@@ -17,7 +17,7 @@ router.put('/:id', async (req, res) => {
         $set: req.body,
       })
       res.status(200).json('Account has been updated.')
-      res.json(user)
+      //res.json(user)
     } catch (err) {
       res.status(500).json(err)
     }
@@ -69,8 +69,8 @@ router.get('/followers/:userId', async (req, res) => {
     )
     let friendList = []
     friends.map((friend) => {
-      const { _id, username, profilePicture } = friend
-      friendList.push({ _id, username, profilePicture })
+      const { _id, username, profilePicture, bio } = friend
+      friendList.push({ _id, username, profilePicture, bio })
     })
     res.status(200).json(friendList)
   } catch (err) {

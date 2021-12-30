@@ -14,6 +14,17 @@ router.post('/', verify, async (req, res) => {
   }
 })
 
+//create a tweet reply
+router.put('/:id/reply', async (req, res) => {
+  try {
+    const tweet = await Tweet.findById(req.params.id)
+    await tweet.updateOne({ $push: { replies: req.body.userId } })
+    res.status(200).json('Reply was sent!')
+  } catch (err) {
+    res.status(500).json(err)
+  }
+})
+
 //update a tweet
 // router.put('/:id', async (req, res) => {
 //   try {
@@ -68,8 +79,12 @@ router.put('/:id/retweet', async (req, res) => {
   try {
     const tweet = await Tweet.findById(req.params.id)
     if (!tweet.retweets.includes(req.body.userId)) {
-      await tweet.updateOne({ $push: { retweets: req.body.userId } })
-      res.status(200).json('Tweet was retweeted!')
+      if (tweet.userId !== req.body.userId) {
+        await tweet.updateOne({ $push: { retweets: req.body.userId } })
+        res.status(200).json('Tweet was retweeted!')
+      } else {
+        res.status(403).json("You can't retweet your own tweet on twitterMini")
+      }
     } else {
       await tweet.updateOne({ $pull: { retweets: req.body.userId } })
       res.status(200).json('The retweet was undone')
@@ -89,30 +104,87 @@ router.get('/:id', async (req, res) => {
   }
 })
 
+//get all replies to a tweet
+router.get('/replies/:id', async (req, res) => {
+  try {
+    const replies = await Tweet.find({
+      userId: req.params.id,
+      replies: req.query.tweetId,
+    })
+    res.status(200).json(replies)
+  } catch (err) {
+    res.status(500).json(err)
+  }
+})
+
 //get all tweets for timeline
 router.get('/tm/:userId', verify, async (req, res) => {
   try {
     const currentUser = await User.findById(req.params.userId)
     const userTweets = await Tweet.find({ userId: currentUser._id })
-    const userRetweets = Tweet.find({ retweets: currentUser._id })
     const friendsTweets = await Promise.all(
       currentUser.following.map((friendId) => {
         return Tweet.find({ userId: friendId })
       }),
     )
-    res.status(200).json(userTweets.concat(...friendsTweets))
-    //res.json(userRetweets)
+    const friendsRetweets = await Promise.all(
+      currentUser.following.map((friendId) => {
+        return Tweet.find({ retweets: friendId })
+      }),
+    )
+    res
+      .status(200)
+      .json(userTweets.concat(...friendsTweets, ...friendsRetweets))
   } catch (err) {
     res.status(500).json(err)
-    //console.log(err)
   }
 })
 
 //get all user's tweets
-router.get('/profile/:username', async (req, res) => {
+router.get('/tweets/:username', async (req, res) => {
   try {
     const user = await User.findOne({ username: req.params.username })
     const tweets = await Tweet.find({ userId: user._id })
+    res.status(200).json(tweets)
+  } catch (err) {
+    res.status(500).json(err)
+  }
+})
+
+//get all user's retweets
+router.get('/retweets/:username', async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username })
+    const tweets = await Tweet.find({
+      retweets: '' + user._id,
+    })
+    res.status(200).json(tweets)
+  } catch (err) {
+    res.status(500).json(err)
+  }
+})
+
+//get all user's likes
+router.get('/likes/:username', async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username })
+    const tweets = await Tweet.find({
+      likes: '' + user._id,
+    })
+    res.status(200).json(tweets)
+  } catch (err) {
+    res.status(500).json(err)
+  }
+})
+
+//get all user's media
+router.get('/media/:username', async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username })
+    const tweets = await Tweet.find({
+      userId: user._id,
+      img: { $exists: true, $gte: ' ' },
+    })
     res.status(200).json(tweets)
   } catch (err) {
     res.status(500).json(err)

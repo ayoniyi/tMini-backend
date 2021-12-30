@@ -40,11 +40,23 @@ const UserSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    location: {
+      type: String,
+      default: '',
+    },
     followers: {
       type: Array,
       default: [],
     },
     following: {
+      type: Array,
+      default: [],
+    },
+    notifications: {
+      type: Array,
+      default: [],
+    },
+    notificationsTemp: {
       type: Array,
       default: [],
     },
