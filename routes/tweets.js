@@ -1,6 +1,7 @@
 const router = require('express').Router()
 const Tweet = require('../models/Tweet')
 const User = require('../models/User')
+const Notifications = require('../models/Notifications')
 const verify = require('./verifyToken')
 
 // create a tweet
@@ -15,13 +16,53 @@ router.post('/', verify, async (req, res) => {
 })
 
 //create a tweet reply
-router.put('/:id/reply', async (req, res) => {
+
+// router.put('/reply/:id', async (req, res) => {
+//   try {
+//     const tweet = await Tweet.findById(req.params.id)
+//     const replyTweet =
+//     await tweet.updateOne({ $push: { replies: req.body.userId } })
+//     res.status(200).json(tweet)
+//   } catch (err) {
+//     res.status(500).json(err)
+//   }
+// })
+
+router.post('/reply/:id', async (req, res) => {
+  const tweet = new Tweet(req.body)
   try {
-    const tweet = await Tweet.findById(req.params.id)
-    await tweet.updateOne({ $push: { replies: req.body.userId } })
-    res.status(200).json('Reply was sent!')
+    const newTweet = await tweet.save()
+    const oldTweet = await Tweet.findById(req.params.id)
+    const otherUser = await User.findById(oldTweet.userId)
+    const tempalerts = otherUser.tempAlerts
+    const currentUser = await User.findById(req.body.userId)
+    await oldTweet.updateOne({
+      $push: {
+        replies: {
+          _id: newTweet._id,
+          userId: req.body.userId,
+          desc: req.body.desc,
+          img: req.body.img,
+          likes: [],
+          retweets: [],
+          replies: [],
+        },
+      },
+    })
+    const alert = new Notifications({
+      userImg: currentUser.profilePicture,
+      username: currentUser.username,
+      headline: currentUser.name + ' replied to your tweet.',
+      description: oldTweet.desc,
+    })
+    await otherUser.updateOne({
+      $push: { notifications: alert },
+      $set: { tempAlerts: tempalerts + 1 },
+    })
+    res.status(200).json(newTweet)
   } catch (err) {
     res.status(500).json(err)
+    console.log(err)
   }
 })
 
@@ -44,15 +85,26 @@ router.put('/:id/reply', async (req, res) => {
 router.delete('/:id', verify, async (req, res) => {
   try {
     const tweet = await Tweet.findById(req.params.id)
+    // const replyTweet = await Tweet.find({
+    //   replies: { _id: req.params.id },
+    // })
+    const replyTweet = await Tweet.find({
+      reply: { id: ' ' + req.params.id },
+    })
     // if (tweet.userId === req.body.userId) {
     //   await tweet.deleteOne({ $set: req.body })
     //   res.status(200).json('Tweet deleted successfully')
     // } else {
     //   res.status(403).json('You can only delete your tweet!')
     // }
-    await tweet.deleteOne({ $set: req.body })
+    await tweet.deleteOne({ $set: req.body }) ///////
+    await replyTweet[0].updateOne({ $pull: { replies: { _id: tweet._id } } })
+
+    //console.log('  >>>', replyTweet[0].replies.reverse())
+
     res.status(200).json('Tweet deleted successfully')
   } catch (err) {
+    console.log(err)
     res.status(404).json(err)
   }
 })
@@ -61,16 +113,34 @@ router.delete('/:id', verify, async (req, res) => {
 router.put('/:id/like', async (req, res) => {
   try {
     const tweet = await Tweet.findById(req.params.id)
-    if (!tweet.likes.includes(req.body.userId)) {
-      await tweet.updateOne({ $push: { likes: req.body.userId } })
-      res.status(200).json('Tweet was liked!')
+    const currentUser = await User.findById(req.body.likerId)
+    const otherUser = await User.findById(req.body.ownerId)
+    const tempalerts = otherUser.tempAlerts
+    if (!tweet.likes.includes(req.body.likerId)) {
+      if (tweet.userId !== req.body.likerId) {
+        await tweet.updateOne({ $push: { likes: req.body.likerId } })
+        const alert = new Notifications({
+          userImg: currentUser.profilePicture,
+          username: currentUser.username,
+          headline: currentUser.name + ' liked your tweet.',
+          description: tweet.desc,
+        })
+        await otherUser.updateOne({
+          $push: { notifications: alert },
+          $set: { tempAlerts: tempalerts + 1 },
+        })
+        res.status(200).json('Tweet was liked!')
+      } else {
+        res.status(403).json("You can't like your own tweet on twitterMini")
+      }
     } else {
       // alternate method to unfollow
-      await tweet.updateOne({ $pull: { likes: req.body.userId } })
+      await tweet.updateOne({ $pull: { likes: req.body.likerId } })
       res.status(200).json('The tweet was disliked')
     }
   } catch (err) {
     res.status(500).json(err)
+    console.log(err)
   }
 })
 
@@ -78,19 +148,34 @@ router.put('/:id/like', async (req, res) => {
 router.put('/:id/retweet', async (req, res) => {
   try {
     const tweet = await Tweet.findById(req.params.id)
-    if (!tweet.retweets.includes(req.body.userId)) {
-      if (tweet.userId !== req.body.userId) {
-        await tweet.updateOne({ $push: { retweets: req.body.userId } })
+    const currentUser = await User.findById(req.body.retweeterId)
+    const otherUser = await User.findById(req.body.ownerId)
+    const tempalerts = otherUser.tempAlerts
+    if (!tweet.retweets.includes(req.body.retweeterId)) {
+      if (tweet.userId !== req.body.retweeterId) {
+        await tweet.updateOne({ $push: { retweets: req.body.retweeterId } })
+        await otherUser.updateOne({
+          $push: {
+            notifications: {
+              userImg: currentUser.profilePicture,
+              username: currentUser.username,
+              headline: currentUser.name + ' retweeted your tweet.',
+              description: tweet.desc,
+            },
+          },
+          $set: { tempAlerts: tempalerts + 1 },
+        })
         res.status(200).json('Tweet was retweeted!')
       } else {
         res.status(403).json("You can't retweet your own tweet on twitterMini")
       }
     } else {
-      await tweet.updateOne({ $pull: { retweets: req.body.userId } })
+      await tweet.updateOne({ $pull: { retweets: req.body.retweeterId } })
       res.status(200).json('The retweet was undone')
     }
   } catch (err) {
     res.status(500).json(err)
+    console.log(err)
   }
 })
 
@@ -105,15 +190,15 @@ router.get('/:id', async (req, res) => {
 })
 
 //get all replies to a tweet
-router.get('/replies/:id', async (req, res) => {
+router.get('/replies/:tweetId', async (req, res) => {
   try {
-    const replies = await Tweet.find({
-      userId: req.params.id,
-      replies: req.query.tweetId,
-    })
-    res.status(200).json(replies)
+    const tweet = await Tweet.findById(req.params.id)
+    console.log(tweet)
+    res.status(200).json(tweet.replies)
+    //res.status(200).json(replies)
   } catch (err) {
     res.status(500).json(err)
+    console.log(err)
   }
 })
 

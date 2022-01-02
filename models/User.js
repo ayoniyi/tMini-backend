@@ -1,6 +1,22 @@
 const mongoose = require('mongoose')
 
 //const PatientSchema = mongoose.Schema({ // regular method
+
+const NotificationSchema = new mongoose.Schema({
+  img: {
+    type: String,
+    default: '',
+  },
+  headline: {
+    type: String,
+    default: '',
+  },
+  description: {
+    type: String,
+    default: '',
+  },
+})
+
 const UserSchema = new mongoose.Schema(
   {
     name: {
@@ -56,9 +72,9 @@ const UserSchema = new mongoose.Schema(
       type: Array,
       default: [],
     },
-    notificationsTemp: {
-      type: Array,
-      default: [],
+    tempAlerts: {
+      type: Number,
+      default: 0,
     },
     isAdmin: {
       type: Boolean,

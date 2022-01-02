@@ -1,4 +1,5 @@
 const User = require('../models/User')
+const Notifications = require('../models/Notifications')
 const router = require('express').Router()
 
 //update user
@@ -79,15 +80,63 @@ router.get('/followers/:userId', async (req, res) => {
   }
 })
 
+//get user notifications
+router.get('/notifications/:userId', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId)
+    let notifications = user.notifications
+    user.tempAlerts = 0
+    user.save()
+    res.status(200).json(notifications)
+  } catch (err) {
+    console.log(err)
+    res.status(500).json(err)
+  }
+})
+
+//get user temporary alerts
+router.get('/notifications/temp/:userId', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId)
+    res.status(200).json(user.tempAlerts)
+  } catch (err) {
+    console.log(err)
+    res.status(500).json(err)
+  }
+})
+
+//clear user notifications
+// router.get('/notifications/clear/:userId', async (req, res) => {
+//   try {
+//     const user = await User.findById(req.params.userId)
+//     user.notifications = []
+//     user.save()
+//     res.status(200).json(user.notifications)
+//   } catch (err) {
+//     console.log(err)
+//     res.status(500).json(err)
+//   }
+// })
+
 //follow user
 router.put('/:id/follow', async (req, res) => {
   if (req.body.userId !== req.params.id) {
     try {
       const user = await User.findById(req.params.id)
       const currentUser = await User.findById(req.body.userId)
+      const tempalerts = user.tempAlerts
       if (!user.followers.includes(req.body.userId)) {
         await user.updateOne({ $push: { followers: req.body.userId } })
         await currentUser.updateOne({ $push: { following: req.params.id } })
+        const alert = new Notifications({
+          userImg: currentUser.profilePicture,
+          username: currentUser.username,
+          headline: currentUser.name + ' followed you',
+        })
+        await user.updateOne({
+          $push: { notifications: alert },
+          $set: { tempAlerts: tempalerts + 1 },
+        })
         res.status(200).json('User has been followed')
       } else {
         res.status(403).json('You already follow this user')
