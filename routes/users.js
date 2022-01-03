@@ -59,6 +59,24 @@ router.get('/', async (req, res) => {
   }
 })
 
+// get a user by username
+router.get('/:username', async (req, res) => {
+  const username = req.params.username
+  try {
+    const nameFormat = new RegExp(username)
+    const user = await User.find({
+      username: { $regex: nameFormat },
+    })
+    // send other values apart from password and updatedAt
+    //const { password, updatedAt, ...other } = user._doc
+    res.status(200).json(user)
+  } catch (err) {
+    res.status(500).json(err)
+    console.log(err)
+    //res.json({ message: err })
+  }
+})
+
 //get user followers
 router.get('/followers/:userId', async (req, res) => {
   try {
