@@ -4,9 +4,6 @@ const mongoose = require("mongoose");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const cors = require("cors");
-const cookieSession = require("cookie-session");
-const passport = require("passport");
-const passportSetup = require("./passport");
 // const multer = require('multer')
 // const path = require('path')
 // **
@@ -26,23 +23,8 @@ const conversationRoute = require("./routes/conversations");
 const messageRoute = require("./routes/messages");
 
 // Middlewares
-app.use(
-  cookieSession({
-    name: "session",
-    keys: ["testkey"],
-    maxAge: 24 * 60 * 60 * 100,
-  })
-);
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-    methods: "GET,POST,PUT,DELETE",
-    credentials: true,
-  })
-);
-app.use(passport.initialize());
-app.use(passport.session());
-//app.use(cors());
+
+app.use(cors());
 
 app.use(express.json()); // alternative to body-parser
 app.use(helmet());
